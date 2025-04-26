@@ -1,0 +1,1823 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>School Manager App</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+    <style>
+        /* Add custom styles here if needed, though Tailwind should cover most */
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #f3f4f6; /* Light gray background */
+        }
+        .section {
+            display: none; /* Hide sections by default */
+        }
+        .active-section {
+            display: block; /* Show active section */
+        }
+        /* Style for autocomplete suggestions */
+        #bookSuggestions {
+            position: absolute; /* Position relative to parent input */
+            z-index: 10; /* Ensure it's above other elements */
+            background-color: white;
+            border: 1px solid #d1d5db; /* gray-300 */
+            border-radius: 0.25rem; /* rounded */
+            margin-top: 0.25rem; /* mt-1 */
+            width: 100%; /* full width */
+            max-height: 12rem; /* max-h-48 */
+            overflow-y: auto; /* scroll if too many suggestions */
+            box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 44px 6px -2px rgba(0, 0, 0, 0.05); /* shadow-lg */
+            /* Initially hidden, controlled by JS */
+        }
+        #bookSuggestions li {
+            padding: 0.5rem; /* p-2 */
+            cursor: pointer;
+        }
+        #bookSuggestions li:hover {
+            background-color: #e5e7eb; /* hover:bg-gray-200 */
+        }
+        /* Style for teacher images in search results and details */
+        .teacher-image {
+            width: 80px; /* Adjust size as needed */
+            height: 80px; /* Adjust size as needed */
+            object-fit: cover; /* Crop image to fit */
+            border-radius: 50%; /* Make it round */
+            margin-right: 1rem; /* Space next to text */
+        }
+        /* Style for student images in search results */
+         .student-image {
+             width: 80px; /* Adjust size as needed */
+             height: 80px; /* Adjust size as needed */
+             object-fit: cover; /* Crop image to fit */
+             border-radius: 50%; /* Make it round */
+             margin-right: 1rem; /* Space next to text */
+         }
+          /* Style for PDF content area */
+        #resultCardPdfContent {
+            padding: 20px;
+            background-color: white;
+            font-family: 'Times New Roman', serif; /* Often used in formal documents */
+            font-size: 12pt;
+        }
+        #resultCardPdfContent h2, #resultCardPdfContent h3 {
+            text-align: center;
+            margin-bottom: 10px;
+        }
+        #resultCardPdfContent .student-details, #resultCardPdfContent .marks-table, #resultCardPdfContent .calculated-results, #resultCardPdfContent .signature-area {
+            margin-bottom: 20px;
+        }
+        #resultCardPdfContent .student-details p, #resultCardPdfContent .calculated-results p {
+            margin-bottom: 5px;
+        }
+          #resultCardPdfContent .marks-table table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+          #resultCardPdfContent .marks-table th, #resultCardPdfContent .marks-table td {
+            border: 1px solid #000;
+            padding: 8px;
+            text-align: left;
+        }
+          #resultCardPdfContent .marks-table th {
+            background-color: #f2f2f2;
+        }
+        #resultCardPdfContent .signature-area {
+            margin-top: 40px;
+            text-align: right;
+        }
+        #resultCardPdfContent .signature-line {
+            display: inline-block;
+            width: 200px;
+            border-bottom: 1px solid #000;
+            margin-bottom: 5px;
+        }
+        /* Style for the logo placeholder */
+        #schoolLogoPlaceholder {
+            width: 100px;
+            height: 100px;
+            background-color: #e5e7eb; /* gray-200 */
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            overflow: hidden; /* Hide overflow if image is larger */
+            cursor: pointer; /* Indicate it's clickable */
+             position: relative; /* Needed for absolute positioning of input */
+        }
+          #schoolLogoPlaceholder img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover; /* Cover the area without distortion */
+        }
+          #logoUploadInput {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            opacity: 0; /* Hide the actual file input */
+            cursor: pointer;
+        }
+
+        /* Style for the school header within the PDF content */
+        .pdf-school-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 20px;
+            padding-bottom: 10px;
+            border-bottom: 1px solid #000;
+        }
+        .pdf-school-header .logo {
+            width: 80px; /* Smaller size for PDF */
+            height: 80px; /* Smaller size for PDF */
+            border-radius: 50%;
+            overflow: hidden;
+             flex-shrink: 0; /* Prevent shrinking */
+        }
+          .pdf-school-header .logo img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+        }
+          .pdf-school-header .school-info {
+            text-align: center;
+            flex-grow: 1; /* Allow to take available space */
+            margin: 0 20px; /* Add some margin around the text */
+        }
+          .pdf-school-header .school-info h2 {
+            font-size: 16pt; /* Adjust font size for PDF */
+            font-weight: bold;
+            margin-bottom: 5px;
+             text-align: center; /* Ensure text is centered */
+        }
+          .pdf-school-header .school-info p {
+            font-size: 10pt; /* Adjust font size for PDF */
+            margin-bottom: 0;
+             text-align: center; /* Ensure text is centered */
+        }
+          .pdf-school-header .spacer {
+            width: 80px; /* Match logo width for alignment */
+             flex-shrink: 0; /* Prevent shrinking */
+        }
+
+        /* Styles for Support Staff Section */
+        .support-staff-item {
+            display: flex;
+            align-items: center;
+            border-bottom: 1px solid #e5e7eb; /* gray-200 */
+            padding: 8px 0;
+            cursor: pointer;
+            transition: background-color 0.2s ease-in-out;
+        }
+        .support-staff-item:hover {
+            background-color: #f9fafb; /* gray-50 */
+        }
+        .support-staff-item img {
+            width: 50px;
+            height: 50px;
+            border-radius: 50%;
+            object-fit: cover;
+            margin-right: 12px; /* mr-3 */
+        }
+        .support-staff-details {
+            margin-top: 16px; /* mt-4 */
+            padding-top: 16px; /* pt-4 */
+            border-top: 1px solid #e5e7eb; /* gray-200 */
+        }
+
+        /* Styles for Books Section */
+        .class-group-header {
+            background-color: #e5e7eb; /* gray-200 */
+            padding: 8px;
+            margin-top: 16px; /* mt-4 */
+            cursor: pointer;
+            font-weight: bold;
+            border-radius: 0.25rem; /* rounded */
+        }
+        .book-item {
+            display: flex;
+            align-items: center;
+            border-bottom: 1px solid #e5e7eb; /* gray-200 */
+            padding: 8px 0;
+            cursor: pointer;
+            transition: background-color 0.2s ease-in-out;
+        }
+        .book-item:hover {
+            background-color: #f9fafb; /* gray-50 */
+        }
+        .book-item img {
+            width: 50px;
+            height: 70px; /* Adjust height for book cover aspect ratio */
+            object-fit: cover;
+            margin-right: 12px; /* mr-3 */
+        }
+          .book-details-view {
+            margin-top: 16px; /* mt-4 */
+            padding-top: 16px; /* pt-4 */
+            border-top: 1px solid #e5e7eb; /* gray-200 */
+        }
+          .book-details-view img {
+            width: 100px; /* Larger image in details view */
+            height: 140px; /* Adjust height */
+            object-fit: cover;
+            margin-bottom: 12px;
+        }
+
+        /* Styles for Student Class Grouping */
+        .student-class-group-header {
+             background-color: #d1fae5; /* green-100 */
+             padding: 8px;
+             margin-top: 16px; /* mt-4 */
+             font-weight: bold;
+             border-radius: 0.25rem; /* rounded */
+             border-left: 4px solid #34d399; /* green-500 */
+             margin-bottom: 8px;
+             cursor: pointer; /* Indicate it's clickable */
+             transition: background-color 0.2s ease-in-out;
+        }
+        .student-class-group-header:hover {
+            background-color: #a7f3d0; /* green-200 */
+        }
+         .student-item-list {
+             list-style: none; /* Remove default list styling */
+             padding-left: 16px; /* Indent the list items */
+             display: none; /* Initially hidden */
+         }
+          .student-item-list.active {
+              display: block; /* Show when active */
+          }
+         .student-item-list li {
+             border-bottom: 1px dashed #e5e7eb; /* Light dashed border */
+             padding: 8px 0; /* Increased padding */
+             font-size: 0.9rem;
+             color: #4b5563; /* gray-700 */
+         }
+         .student-item-list li:last-child {
+             border-bottom: none; /* No border for the last item */
+         }
+         .student-details-item {
+             display: flex;
+             align-items: center;
+             margin-bottom: 8px; /* Space between student details */
+             padding-bottom: 8px;
+             border-bottom: 1px solid #f3f4f6; /* Light border between student details */
+         }
+          .student-details-item:last-child {
+              border-bottom: none;
+          }
+         .student-details-item img {
+             width: 60px; /* Slightly smaller image in the list */
+             height: 60px;
+             object-fit: cover;
+             border-radius: 50%;
+             margin-right: 12px;
+         }
+         .student-details-text p {
+             margin-bottom: 4px; /* Space between detail lines */
+         }
+
+         /* Styles for Teacher Search Results Details */
+         .teacher-details-item {
+             display: flex;
+             align-items: center;
+             border-bottom: 1px solid #e5e7eb; /* gray-200 */
+             padding: 8px 0;
+         }
+         .teacher-details-item:last-child {
+             border-bottom: none;
+         }
+          .teacher-details-text p {
+             margin-bottom: 4px; /* Space between detail lines */
+         }
+
+         /* Styles for Result Card Student Info Layout */
+         .result-student-info {
+             display: flex;
+             align-items: flex-start; /* Align items to the top */
+             margin-bottom: 20px;
+             padding-bottom: 10px;
+             border-bottom: 1px solid #e5e7eb; /* gray-200 */
+         }
+         .result-student-info .student-image {
+             width: 100px; /* Larger image in result card */
+             height: 100px;
+             object-fit: cover;
+             border-radius: 50%;
+             margin-right: 20px; /* More space next to details */
+             flex-shrink: 0; /* Prevent shrinking */
+         }
+         .result-student-details-text {
+             flex-grow: 1; /* Allow text to take remaining space */
+         }
+         .result-student-details-text p {
+             margin-bottom: 5px; /* Space between detail lines */
+         }
+
+
+    </style>
+</head>
+<body class="p-4">
+
+    <div class="container mx-auto bg-white rounded-lg shadow-lg p-6">
+
+        <div class="flex flex-col md:flex-row items-center justify-between mb-8 pb-4 border-b border-gray-200">
+            <div id="schoolLogoPlaceholder" class="mb-4 md:mb-0">
+                <img id="uploadedLogo" src="#" alt="School Logo" class="hidden">
+                 <span id="logoText" class="text-gray-600 text-sm font-semibold">Upload Logo</span>
+                 <input type="file" id="logoUploadInput" accept="image/*">
+            </div>
+
+            <div class="text-center md:text-left md:ml-6">
+                <h1 class="text-2xl font-bold text-gray-800">Muhammad Hasnain Full Stack Developer</h1>
+                <p class="text-gray-600">Azal Town, Near Bank wali gali number 1 hussani chok, bahawalpur 63100</p>
+            </div>
+
+             <div class="hidden md:block w-24"></div>
+        </div>
+
+
+        <div class="flex flex-wrap justify-center gap-4 mb-8">
+            <button class="nav-button bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded focus:outline-none focus:shadow-outline" data-section="students">Students</button>
+            <button class="nav-button bg-green-500 hover:bg-green-700 text-white font-bold py-2 px-4 rounded focus:outline-none focus:shadow-outline" data-section="teachers">Teachers</button>
+            <button class="nav-button bg-red-500 hover:bg-red-700 text-white font-bold py-2 px-4 rounded focus:outline-none focus:shadow-outline" data-section="results">Result Cards</button>
+            <button class="nav-button bg-yellow-500 hover:bg-yellow-700 text-white font-bold py-2 px-4 rounded focus:outline-none focus:shadow-outline" data-section="support">Support Staff</button>
+            <button class="nav-button bg-purple-500 hover:bg-purple-500 text-white font-bold py-2 px-4 rounded focus:outline-none focus:shadow-outline" data-section="books">Books</button>
+        </div>
+
+        <div id="students" class="section p-4 border rounded-lg border-gray-200">
+            <h2 class="text-xl font-semibold mb-4 text-gray-700">Students Data</h2>
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                    <label for="studentImageUpload" class="block text-gray-700 text-sm font-bold mb-2">Student Image:</label>
+                    <input type="file" id="studentImageUpload" accept="image/*" class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline">
+                </div>
+                <div>
+                    <label for="studentId" class="block text-gray-700 text-sm font-bold mb-2">Student ID:</label>
+                    <input type="text" id="studentId" class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline">
+                </div>
+                <div>
+                    <label for="studentName" class="block text-gray-700 text-sm font-bold mb-2">Name:</label>
+                    <input type="text" id="studentName" class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline">
+                </div>
+                <div>
+                    <label for="fatherName" class="block text-gray-700 text-sm font-bold mb-2">Father's Name:</label>
+                    <input type="text" id="fatherName" class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline">
+                </div>
+                <div>
+                    <label for="rollNumber" class="block text-gray-700 text-sm font-bold mb-2">Roll Number:</label>
+                    <input type="text" id="rollNumber" class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline">
+                </div>
+                <div>
+                    <label for="studentClass" class="block text-gray-700 text-sm font-bold mb-2">Class:</label>
+                    <input type="text" id="studentClass" class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline">
+                </div>
+                 <div>
+                    <label for="classIncharge" class="block text-gray-700 text-sm font-bold mb-2">Class Incharge:</label>
+                    <input type="text" id="classIncharge" class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline">
+                </div>
+                 <div>
+                    <label for="parentsContact" class="block text-gray-700 text-sm font-bold mb-2">Parents Contact Number:</label>
+                    <input type="tel" id="parentsContact" class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline">
+                </div>
+            </div>
+            <button id="addStudentButton" class="mt-4 bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded focus:outline-none focus:shadow-outline">Add Student</button>
+            <div class="mt-6">
+                <h3 class="text-lg font-medium mb-2 text-gray-600">Saved Students by Class</h3>
+                <div id="studentList">
+                    </div>
+            </div>
+             <div class="mt-6">
+                <h3 class="text-lg font-medium mb-2 text-gray-600">Search Students</h3>
+                 <input type="text" id="searchStudentInput" placeholder="Search by Name, Roll No, Student ID or Class" class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline">
+                <button id="searchStudentButton" class="mt-2 bg-gray-500 hover:bg-gray-700 text-white font-bold py-2 px-4 rounded focus:outline-none focus:shadow-outline">Search</button>
+            </div>
+            <div id="searchResults" class="mt-6">
+                 <h3 class="text-lg font-medium mb-2 text-gray-600">Search Results</h3>
+                 <div id="searchResultsContent">
+                     <p class="text-gray-500">No results yet.</p>
+                 </div>
+            </div>
+             </div>
+
+        <div id="teachers" class="section p-4 border rounded-lg border-gray-200">
+            <h2 class="text-xl font-semibold mb-4 text-gray-700">Teachers Data</h2>
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                    <label for="teacherImageUpload" class="block text-gray-700 text-sm font-bold mb-2">Teacher Image:</label>
+                    <input type="file" id="teacherImageUpload" accept="image/*" class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline">
+                </div>
+                <div>
+                    <label for="teacherName" class="block text-gray-700 text-sm font-bold mb-2">Name:</label>
+                    <input type="text" id="teacherName" class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline">
+                </div>
+                <div>
+                    <label for="cardNumber" class="block text-gray-700 text-sm font-bold mb-2">Card Number:</label>
+                    <input type="text" id="cardNumber" class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline">
+                </div>
+                <div>
+                    <label for="assignedClass" class="block text-gray-700 text-sm font-bold mb-2">Assigned Class:</label>
+                    <input type="text" id="assignedClass" class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline">
+                </div>
+                 <div>
+                    <label for="teacherPhone" class="block text-gray-700 text-sm font-bold mb-2">Teacher Number:</label>
+                    <input type="tel" id="teacherPhone" class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline">
+                </div>
+                 <div>
+                    <label for="teacherLinkedin" class="block text-gray-700 text-sm font-bold mb-2">LinkedIn Profile:</label>
+                    <input type="url" id="teacherLinkedin" class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline">
+                </div>
+            </div>
+             <button id="addTeacherButton" class="mt-4 bg-green-500 hover:bg-green-700 text-white font-bold py-2 px-4 rounded focus:outline-none focus:shadow-outline">Add Teacher</button>
+             <div class="mt-6">
+                <h3 class="text-lg font-medium mb-2 text-gray-600">Saved Teachers (Names Only)</h3>
+                <ul id="teacherList" class="list-disc list-inside">
+                    </ul>
+            </div>
+            <div class="mt-6">
+                <h3 class="text-lg font-medium mb-2 text-gray-600">Search Teachers</h3>
+                 <input type="text" id="searchTeacherInput" placeholder="Search by Name, Card No, Class, or Phone" class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline">
+                <button id="searchTeacherButton" class="mt-2 bg-gray-500 hover:bg-gray-700 text-white font-bold py-2 px-4 rounded focus:outline-none focus:shadow-outline">Search</button>
+            </div>
+            <div id="teacherSearchResults" class="mt-6">
+                 <h3 class="text-lg font-medium mb-2 text-gray-600">Search Results</h3>
+                 <div id="teacherSearchResultsContent">
+                     <p class="text-gray-500">No results yet.</p>
+                 </div>
+            </div>
+             </div>
+
+        <div id="results" class="section p-4 border rounded-lg border-gray-200">
+            <h2 class="text-xl font-semibold mb-4 text-gray-700">Result Cards</h2>
+
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+                <div>
+                    <label for="resultStudentImageUpload" class="block text-gray-700 text-sm font-bold mb-2">Student Image:</label>
+                    <input type="file" id="resultStudentImageUpload" accept="image/*" class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline">
+                </div>
+                <div>
+                    <label for="resultStudentId" class="block text-gray-700 text-sm font-bold mb-2">Student ID:</label>
+                    <input type="text" id="resultStudentId" class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline">
+                </div>
+                <div>
+                    <label for="resultStudentName" class="block text-gray-700 text-sm font-bold mb-2">Student Name:</label>
+                    <input type="text" id="resultStudentName" class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline">
+                </div>
+                <div>
+                    <label for="resultFatherName" class="block text-gray-700 text-sm font-bold mb-2">Father's Name:</label>
+                    <input type="text" id="resultFatherName" class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline">
+                </div>
+                <div>
+                    <label for="resultRollNumber" class="block text-gray-700 text-sm font-bold mb-2">Roll Number:</label>
+                    <input type="text" id="resultRollNumber" class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline">
+                </div>
+                 <div>
+                    <label for="resultClass" class="block text-gray-700 text-sm font-bold mb-2">Class:</label>
+                    <input type="text" id="resultClass" class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline">
+                </div>
+            </div>
+
+            <div class="mt-4">
+                <h3 class="text-lg font-medium mb-2 text-gray-600">Subject Marks (Classes 1-10)</h3>
+                 <div class="grid grid-cols-5 gap-4 mb-2 font-semibold text-gray-700">
+                    <div>Book Name</div>
+                    <div>Full Marks</div>
+                    <div>Pass Marks</div>
+                    <div>Obtained Marks</div>
+                    <div>Grade</div>
+                 </div>
+                 <div id="subjectMarksInputs">
+                     </div>
+                 <button id="addSubjectButton" class="mt-2 bg-gray-400 hover:bg-gray-600 text-white font-bold py-1 px-3 rounded focus:outline-none focus:shadow-outline">Add Subject</button>
+                 <button id="removeSubjectButton" class="mt-2 bg-gray-400 hover:bg-gray-600 text-white font-bold py-1 px-3 rounded focus:outline-none focus:shadow-outline">Remove Last Subject</button>
+            </div>
+
+            <div class="mt-6 border-t pt-4 border-gray-200">
+                 <h3 class="text-lg font-medium mb-2 text-gray-600">Calculated Results</h3>
+                <p>Total Full Marks: <span id="totalFullMarks">0</span></p>
+                <p>Total Pass Marks: <span id="totalPassMarks">0</span></p>
+                <p>Total Obtained Marks: <span id="totalObtainedMarks">0</span></p>
+                <p>Percentage: <span id="percentage">0%</span></p>
+                <p>Grade: <span id="grade">-</span></p>
+                <p>Result Status: <span id="resultStatus">-</span></p> </div>
+
+            <div class="signature-area mt-8">
+                <div class="signature-line"></div>
+                <p class="text-center text-gray-700 text-sm">Principal's Signature</p>
+            </div>
+
+
+            <button id="saveResultButton" class="mt-4 bg-red-500 hover:bg-red-700 text-white font-bold py-2 px-4 rounded focus:outline-none focus:shadow-outline">Save Result</button>
+            <button id="generatePdfButton" class="mt-4 bg-indigo-500 hover:bg-indigo-700 text-white font-bold py-2 px-4 rounded focus:outline-none focus:shadow-outline">Generate PDF</button>
+
+            <div class="mt-6 border-t pt-4 border-gray-200">
+                <h3 class="text-lg font-medium mb-2 text-gray-600">Search Result Cards</h3>
+                 <input type="text" id="searchResultInput" placeholder="Search by Student Name or Roll No" class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline">
+                <button id="searchResultButton" class="mt-2 bg-gray-500 hover:bg-gray-700 text-white font-bold py-2 px-4 rounded focus:outline-none focus:shadow-outline">Search</button>
+            </div>
+            <div id="resultSearchResults" class="mt-6">
+                 <h3 class="text-lg font-medium mb-2 text-gray-600">Search Results</h3>
+                 <div id="resultSearchResultsContent">
+                     <p class="text-gray-500">No results yet.</p>
+                 </div>
+                 <div id="loadedResultCard" class="mt-4 p-4 border rounded-lg border-gray-300 hidden">
+                     <h4 class="text-lg font-semibold mb-2 text-gray-700">Loaded Result Card</h4>
+                      <div id="resultCardPdfContent">
+                          </div>
+                     <button id="downloadLoadedPdfButton" class="mt-4 bg-indigo-500 hover:bg-indigo-700 text-white font-bold py-2 px-4 rounded focus:outline-none focus:shadow-outline hidden">Download PDF</button>
+                 </div>
+            </div>
+             </div>
+
+        <div id="support" class="section p-4 border rounded-lg border-gray-200">
+            <h2 class="text-xl font-semibold mb-4 text-gray-700">Support Staff Data</h2>
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+                <div>
+                    <label for="supportStaffImageUpload" class="block text-gray-700 text-sm font-bold mb-2">Image Upload:</label>
+                    <input type="file" id="supportStaffImageUpload" accept="image/*" class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline">
+                </div>
+                <div>
+                    <label for="supportStaffName" class="block text-gray-700 text-sm font-bold mb-2">Name:</label>
+                    <input type="text" id="supportStaffName" class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline">
+                </div>
+                <div>
+                    <label for="supportStaffFatherName" class="block text-gray-700 text-sm font-bold mb-2">Father's Name:</label>
+                    <input type="text" id="supportStaffFatherName" class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline">
+                </div>
+                <div>
+                    <label for="supportStaffRole" class="block text-gray-700 text-sm font-bold mb-2">Role/Title:</label>
+                    <input type="text" id="supportStaffRole" class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline">
+                </div>
+                 <div>
+                    <label for="supportStaffEmail" class="block text-gray-700 text-sm font-bold mb-2">Email:</label>
+                    <input type="email" id="supportStaffEmail" class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline">
+                </div>
+                 <div>
+                    <label for="supportStaffPhone" class="block text-gray-700 text-sm font-bold mb-2">Phone Number:</label>
+                    <input type="tel" id="supportStaffPhone" class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline">
+                </div>
+                 <div>
+                    <label for="supportStaffLinkedin" class="block text-gray-700 text-sm font-bold mb-2">LinkedIn Profile Link:</label>
+                    <input type="url" id="supportStaffLinkedin" class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline">
+                </div>
+            </div>
+             <button id="addSupportStaffButton" class="mt-4 bg-yellow-500 hover:bg-yellow-700 text-white font-bold py-2 px-4 rounded focus:outline-none focus:shadow-outline">Add Staff</button>
+
+            <div class="mt-6">
+                <h3 class="text-lg font-medium mb-2 text-gray-600">Saved Support Staff</h3>
+                <div id="supportStaffList" class="list-none">
+                     </div>
+            </div>
+
+            <div id="supportStaffDetailsView" class="support-staff-details hidden">
+                 <h3 class="text-lg font-semibold mb-2 text-gray-700">Staff Details</h3>
+                 <img id="supportStaffDetailImage" src="#" alt="Staff Image" class="teacher-image mb-4 hidden">
+                 <p><span class="font-semibold">Name:</span> <span id="supportStaffDetailName">-</span></p>
+                 <p><span class="font-semibold">Father's Name:</span> <span id="supportStaffDetailFatherName">-</span></p>
+                 <p><span class="font-semibold">Role/Title:</span> <span id="supportStaffDetailRole">-</span></p>
+                 <p><span class="font-semibold">Email:</span> <span id="supportStaffDetailEmail">-</span></p>
+                 <p><span class="font-semibold">Phone Number:</span> <span id="supportStaffDetailPhone">-</span></p>
+                 <p><span class="font-semibold">LinkedIn:</span> <a href="#" id="supportStaffDetailLinkedin" target="_blank" class="text-blue-500 hover:underline">-</a></p>
+                 <button id="closeSupportStaffDetails" class="mt-4 bg-gray-500 hover:bg-gray-700 text-white font-bold py-1 px-3 rounded focus:outline-none focus:shadow-outline">Close Details</button>
+            </div>
+             </div>
+
+        <div id="books" class="section p-4 border rounded-lg border-gray-200">
+            <h2 class="text-xl font-semibold mb-4 text-gray-700">Book Records</h2>
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+                <div>
+                    <label for="bookClass" class="block text-gray-700 text-sm font-bold mb-2">Class:</label>
+                    <select id="bookClass" class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline">
+                        <option value="">Select Class</option>
+                        <option value="Class 1">Class 1</option>
+                        <option value="Class 2">Class 2</option>
+                        <option value="Class 3">Class 3</option>
+                        <option value="Class 4">Class 4</option>
+                        <option value="Class 5">Class 5</option>
+                        <option value="Class 6">Class 6</option>
+                        <option value="Class 7">Class 7</option>
+                        <option value="Class 8">Class 8</option>
+                        <option value="Class 9">Class 9</option>
+                        <option value="Class 10">Class 10</option>
+                    </select>
+                </div>
+                <div>
+                    <label for="bookNameInput" class="block text-gray-700 text-sm font-bold mb-2">Book Name:</label>
+                    <input type="text" id="bookNameInput" class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline">
+                     <ul id="bookSuggestions" class="absolute z-10 bg-white border border-gray-300 rounded mt-1 w-full max-h-48 overflow-y-auto shadow-lg hidden">
+                     </ul>
+                </div>
+                <div>
+                    <label for="bookImageUpload" class="block text-gray-700 text-sm font-bold mb-2">Book Image Upload:</label>
+                    <input type="file" id="bookImageUpload" accept="image/*" class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline">
+                </div>
+                <div class="md:col-span-2">
+                    <label for="bookDescription" class="block text-gray-700 text-sm font-bold mb-2">Description (max 300 chars):</label>
+                    <textarea id="bookDescription" class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline" maxlength="300" rows="3"></textarea>
+                </div>
+            </div>
+            <button id="addBookButton" class="mt-4 bg-purple-500 hover:bg-purple-700 text-white font-bold py-2 px-4 rounded focus:outline-none focus:shadow-outline">Add Book</button>
+
+            <div class="mt-6">
+                <h3 class="text-lg font-medium mb-2 text-gray-600">Saved Books by Class</h3>
+                <div id="savedBooksList">
+                     </div>
+            </div>
+
+             <div id="bookDetailsView" class="book-details-view hidden">
+                 <h3 class="text-lg font-semibold mb-2 text-gray-700">Book Details</h3>
+                 <img id="bookDetailImage" src="#" alt="Book Cover" class="mb-4 hidden">
+                 <p><span class="font-semibold">Name:</span> <span id="bookDetailName">-</span></p>
+                 <p><span class="font-semibold">Class:</span> <span id="bookDetailClass">-</span></p>
+                 <p><span class="font-semibold">Description:</span> <span id="bookDetailDescription">-</span></p>
+                 <button id="closeBookDetails" class="mt-4 bg-gray-500 hover:bg-gray-700 text-white font-bold py-1 px-3 rounded focus:outline-none focus:shadow-outline">Close Details</button>
+             </div>
+             </div>
+
+    </div>
+
+    <footer class="mt-8 py-4 text-center text-gray-600 text-sm">
+        <p> All Rights by © Muhammad Hasnain Full Stack Developer - 2025 | Muhammad Hasnain CEO at HT Digital Hub</p>
+    </footer>
+
+    <script>
+        // JavaScript for section navigation
+        document.addEventListener('DOMContentLoaded', () => {
+            console.log("DOM fully loaded and parsed."); // Debugging
+            const navButtons = document.querySelectorAll('.nav-button');
+            const sections = document.querySelectorAll('.section');
+
+            // Function to show a specific section
+            const showSection = (sectionId) => {
+                console.log(`Showing section: ${sectionId}`); // Debugging
+                sections.forEach(section => {
+                    section.classList.remove('active-section');
+                });
+                const activeSection = document.getElementById(sectionId);
+                if (activeSection) {
+                    activeSection.classList.add('active-section');
+                }
+            };
+
+            // Add click event listeners to navigation buttons
+            navButtons.forEach(button => {
+                button.addEventListener('click', () => {
+                    const sectionId = button.getAttribute('data-section');
+                    showSection(sectionId);
+                });
+            });
+
+            // --- School Header Logo Upload ---
+            const logoUploadInput = document.getElementById('logoUploadInput');
+            const uploadedLogoImg = document.getElementById('uploadedLogo');
+            const logoTextSpan = document.getElementById('logoText');
+
+            // Load saved logo from Local Storage on page load
+            const loadLogo = () => {
+                const savedLogo = localStorage.getItem('schoolLogo');
+                if (savedLogo) {
+                    uploadedLogoImg.src = savedLogo;
+                    uploadedLogoImg.classList.remove('hidden');
+                    logoTextSpan.classList.add('hidden');
+                } else {
+                     uploadedLogoImg.classList.add('hidden');
+                     logoTextSpan.classList.remove('hidden');
+                }
+            };
+
+            // Handle logo file input change
+            logoUploadInput.addEventListener('change', (event) => {
+                const file = event.target.files[0];
+                if (file) {
+                    const reader = new FileReader();
+                    reader.onload = (e) => {
+                        const imgUrl = e.target.result;
+                        uploadedLogoImg.src = imgUrl;
+                        uploadedLogoImg.classList.remove('hidden');
+                        logoTextSpan.classList.add('hidden');
+                        // Save the logo to Local Storage
+                        localStorage.setItem('schoolLogo', imgUrl);
+                    };
+                    reader.readAsDataURL(file);
+                }
+            });
+
+            // Load logo on initial page load
+            loadLogo();
+
+            // --- Student Section ---
+            const studentImageUploadInput = document.getElementById('studentImageUpload');
+            const studentIdInput = document.getElementById('studentId');
+            const studentNameInput = document.getElementById('studentName');
+            const fatherNameInput = document.getElementById('fatherName');
+            const rollNumberInput = document.getElementById('rollNumber');
+            const studentClassInput = document.getElementById('studentClass');
+            const classInchargeInput = document.getElementById('classIncharge');
+            const parentsContactInput = document.getElementById('parentsContact'); // Get the new input
+            const addStudentButton = document.getElementById('addStudentButton');
+            const studentListDiv = document.getElementById('studentList');
+            const searchStudentInput = document.getElementById('searchStudentInput');
+            const searchStudentButton = document.getElementById('searchStudentButton');
+            const searchResultsContent = document.getElementById('searchResultsContent');
+
+            let students = JSON.parse(localStorage.getItem('students')) || [];
+
+            const renderStudentList = () => {
+                studentListDiv.innerHTML = ''; // Clear the div
+                if (students.length === 0) {
+                    studentListDiv.innerHTML = '<p class="text-gray-500">No students added yet.</p>';
+                } else {
+                    // Group students by class
+                    const studentsByClass = students.reduce((acc, student) => {
+                        (acc[student.studentClass] = acc[student.studentClass] || []).push(student);
+                        return acc;
+                    }, {});
+
+                    // Sort class names for consistent order (optional)
+                    const sortedClassNames = Object.keys(studentsByClass).sort();
+
+                    sortedClassNames.forEach(className => {
+                        // Create a header for each class
+                        const classGroupHeader = document.createElement('div');
+                        classGroupHeader.classList.add('student-class-group-header');
+                        classGroupHeader.textContent = className;
+                        // Add click listener to toggle student list visibility
+                        classGroupHeader.addEventListener('click', () => {
+                            const studentListForClass = classGroupHeader.nextElementSibling;
+                            if (studentListForClass && studentListForClass.classList.contains('student-item-list')) {
+                                studentListForClass.classList.toggle('active');
+                            }
+                        });
+                        studentListDiv.appendChild(classGroupHeader);
+
+                        // Create a list for students in this class
+                        const studentListForClass = document.createElement('ul');
+                        studentListForClass.classList.add('student-item-list'); // Initially hidden by CSS
+                        studentListDiv.appendChild(studentListForClass);
+
+                        // Sort students within the class by name (optional)
+                        const sortedStudentsInClass = studentsByClass[className].sort((a, b) => a.name.localeCompare(b.name));
+
+                        sortedStudentsInClass.forEach(student => {
+                            const listItem = document.createElement('li');
+                            listItem.classList.add('student-details-item'); // Add class for styling student details
+
+                            const imgHtml = student.imageUrl ? `<img src="${student.imageUrl}" alt="${student.name}">` : '';
+
+                            listItem.innerHTML = `
+                                ${imgHtml}
+                                <div class="student-details-text">
+                                    <p><span class="font-semibold">Name:</span> ${student.name}</p>
+                                    <p><span class="font-semibold">Student ID:</span> ${student.studentId || '-'}</p>
+                                    <p><span class="font-semibold">Roll Number:</span> ${student.rollNumber}</p>
+                                    <p><span class="font-semibold">Father's Name:</span> ${student.fatherName}</p>
+                                    <p><span class="font-semibold">Parents Contact:</span> ${student.parentsContact || '-'}</p>
+                                    <p><span class="font-semibold">Class Incharge:</span> ${student.classIncharge}</p>
+                                </div>
+                            `;
+                            studentListForClass.appendChild(listItem);
+                        });
+                    });
+                }
+            };
+
+
+            const addStudent = () => {
+                const imageFile = studentImageUploadInput.files[0];
+                const studentId = studentIdInput.value.trim();
+                const name = studentNameInput.value.trim();
+                const fatherName = fatherNameInput.value.trim();
+                const rollNumber = rollNumberInput.value.trim();
+                const studentClass = studentClassInput.value.trim();
+                const classIncharge = classInchargeInput.value.trim();
+                const parentsContact = parentsContactInput.value.trim(); // Get parents contact
+
+                if (!studentId || !name || !fatherName || !rollNumber || !studentClass || !classIncharge || !parentsContact) {
+                    alert('Please fill in all student details (Student ID, Name, Father\'s Name, Roll Number, Class, Class Incharge, Parents Contact Number).');
+                    return;
+                }
+
+                 // Check if student ID or Roll Number already exists
+                 const existingStudent = students.find(s => s.studentId === studentId || s.rollNumber === rollNumber);
+                 if (existingStudent) {
+                     alert(`A student with the same Student ID (${studentId}) or Roll Number (${rollNumber}) already exists.`);
+                     return;
+                 }
+
+
+                const reader = new FileReader();
+                reader.onload = (e) => {
+                    const imageUrl = e.target.result;
+                    const newStudent = { imageUrl, studentId, name, fatherName, rollNumber, studentClass, classIncharge, parentsContact }; // Include parentsContact
+                    students.push(newStudent);
+                    localStorage.setItem('students', JSON.stringify(students));
+                    renderStudentList();
+                    // Clear form
+                    studentImageUploadInput.value = '';
+                    studentIdInput.value = '';
+                    studentNameInput.value = '';
+                    fatherNameInput.value = '';
+                    rollNumberInput.value = '';
+                    studentClassInput.value = '';
+                    classInchargeInput.value = '';
+                    parentsContactInput.value = ''; // Clear parents contact input
+                };
+
+                if (imageFile) {
+                    reader.readAsDataURL(imageFile);
+                } else {
+                    const newStudent = { imageUrl: '', studentId, name, fatherName, rollNumber, studentClass, classIncharge, parentsContact }; // Include parentsContact
+                    students.push(newStudent);
+                    localStorage.setItem('students', JSON.stringify(students));
+                    renderStudentList();
+                    // Clear form
+                    studentImageUploadInput.value = '';
+                    studentIdInput.value = '';
+                    studentNameInput.value = '';
+                    fatherNameInput.value = '';
+                    rollNumberInput.value = '';
+                    studentClassInput.value = '';
+                    classInchargeInput.value = '';
+                    parentsContactInput.value = ''; // Clear parents contact input
+                }
+            };
+
+            const searchStudents = () => {
+                const searchTerm = searchStudentInput.value.toLowerCase().trim();
+                searchResultsContent.innerHTML = '';
+
+                if (!searchTerm) {
+                    searchResultsContent.innerHTML = '<p class="text-gray-500">Please enter a search term.</p>';
+                    return;
+                }
+
+                const filteredStudents = students.filter(student =>
+                    student.name.toLowerCase().includes(searchTerm) ||
+                    student.rollNumber.toLowerCase().includes(searchTerm) ||
+                    (student.studentId && student.studentId.toLowerCase().includes(searchTerm)) || // Search by Student ID
+                    (student.parentsContact && student.parentsContact.toLowerCase().includes(searchTerm)) || // Search by Parents Contact
+                    student.studentClass.toLowerCase().includes(searchTerm)
+                );
+
+                if (filteredStudents.length === 0) {
+                    searchResultsContent.innerHTML = '<p class="text-gray-500">No students found matching your search.</p>';
+                } else {
+                    filteredStudents.forEach(student => {
+                        const resultItem = document.createElement('div');
+                        resultItem.classList.add('border-b', 'border-gray-200', 'py-2', 'flex', 'items-center');
+                        const imgHtml = student.imageUrl ? `<img src="${student.imageUrl}" alt="${student.name}" class="student-image">` : ''; // Use student-image class
+                        resultItem.innerHTML = `
+                            ${imgHtml}
+                            <div>
+                                <p><span class="font-semibold">Name:</span> ${student.name}</p>
+                                <p><span class="font-semibold">Student ID:</span> ${student.studentId || '-'}</p>
+                                <p><span class="font-semibold">Father's Name:</span> ${student.fatherName}</p>
+                                <p><span class="font-semibold">Roll Number:</span> ${student.rollNumber}</p>
+                                <p><span class="font-semibold">Class:</span> ${student.studentClass}</p>
+                                <p><span class="font-semibold">Class Incharge:</span> ${student.classIncharge}</p>
+                                <p><span class="font-semibold">Parents Contact:</span> ${student.parentsContact || '-'}</p>
+                            </div>
+                        `;
+                        searchResultsContent.appendChild(resultItem);
+                    });
+                }
+            };
+
+            addStudentButton.addEventListener('click', addStudent);
+            searchStudentButton.addEventListener('click', searchStudents);
+
+            // Initial render of student list
+            renderStudentList();
+
+            // --- Teachers Section ---
+            const teacherImageUploadInput = document.getElementById('teacherImageUpload'); // Changed ID
+            const teacherNameInput = document.getElementById('teacherName');
+            const cardNumberInput = document.getElementById('cardNumber');
+            const assignedClassInput = document.getElementById('assignedClass');
+            const teacherPhoneInput = document.getElementById('teacherPhone'); // New input
+            const teacherLinkedinInput = document.getElementById('teacherLinkedin'); // New input
+            const addTeacherButton = document.getElementById('addTeacherButton');
+            const teacherList = document.getElementById('teacherList');
+            const searchTeacherInput = document.getElementById('searchTeacherInput');
+            const searchTeacherButton = document.getElementById('searchTeacherButton');
+            const teacherSearchResultsContent = document.getElementById('teacherSearchResultsContent');
+
+            let teachers = JSON.parse(localStorage.getItem('teachers')) || [];
+
+            const renderTeacherList = () => {
+                teacherList.innerHTML = '';
+                 if (teachers.length === 0) {
+                    teacherList.innerHTML = '<p class="text-gray-500">No teachers added yet.</p>';
+                } else {
+                    teachers.forEach(teacher => {
+                        const listItem = document.createElement('li');
+                        listItem.textContent = teacher.name;
+                        teacherList.appendChild(listItem);
+                    });
+                }
+            };
+
+            const addTeacher = () => {
+                 const imageFile = teacherImageUploadInput.files[0]; // Get file from upload input
+                const name = teacherNameInput.value.trim();
+                const cardNumber = cardNumberInput.value.trim();
+                const assignedClass = assignedClassInput.value.trim();
+                const phone = teacherPhoneInput.value.trim(); // Get phone number
+                const linkedin = teacherLinkedinInput.value.trim(); // Get LinkedIn profile
+
+                if (!name || !cardNumber || !assignedClass || !phone) { // Made phone mandatory
+                    alert('Please fill in all teacher details (Name, Card Number, Assigned Class, Teacher Number).');
+                    return;
+                }
+
+                 const reader = new FileReader();
+                 reader.onload = (e) => {
+                     const imageUrl = e.target.result;
+                     const newTeacher = { imageUrl, name, cardNumber, assignedClass, phone, linkedin }; // Include new fields
+                     teachers.push(newTeacher);
+                     localStorage.setItem('teachers', JSON.stringify(teachers));
+                     renderTeacherList();
+                     // Clear form
+                     teacherImageUploadInput.value = '';
+                     teacherNameInput.value = '';
+                     cardNumberInput.value = '';
+                     assignedClassInput.value = '';
+                     teacherPhoneInput.value = ''; // Clear phone input
+                     teacherLinkedinInput.value = ''; // Clear LinkedIn input
+                 };
+
+                 if (imageFile) {
+                     reader.readAsDataURL(imageFile);
+                 } else {
+                     const newTeacher = { imageUrl: '', name, cardNumber, assignedClass, phone, linkedin }; // Include new fields
+                     teachers.push(newTeacher);
+                     localStorage.setItem('teachers', JSON.stringify(teachers));
+                     renderTeacherList();
+                     // Clear form
+                     teacherImageUploadInput.value = '';
+                     teacherNameInput.value = '';
+                     cardNumberInput.value = '';
+                     assignedClassInput.value = '';
+                     teacherPhoneInput.value = ''; // Clear phone input
+                     teacherLinkedinInput.value = ''; // Clear LinkedIn input
+                 }
+            };
+
+            const searchTeachers = () => {
+                const searchTerm = searchTeacherInput.value.toLowerCase().trim();
+                teacherSearchResultsContent.innerHTML = '';
+
+                if (!searchTerm) {
+                    teacherSearchResultsContent.innerHTML = '<p class="text-gray-500">Please enter a search term.</p>';
+                    return;
+                }
+
+                const filteredTeachers = teachers.filter(teacher =>
+                    teacher.name.toLowerCase().includes(searchTerm) ||
+                    teacher.cardNumber.toLowerCase().includes(searchTerm) ||
+                    teacher.assignedClass.toLowerCase().includes(searchTerm) ||
+                    (teacher.phone && teacher.phone.toLowerCase().includes(searchTerm)) // Search by phone number
+                );
+
+                if (filteredTeachers.length === 0) {
+                    teacherSearchResultsContent.innerHTML = '<p class="text-gray-500">No teachers found matching your search.</p>';
+                } else {
+                    filteredTeachers.forEach(teacher => {
+                        const resultItem = document.createElement('div');
+                         resultItem.classList.add('teacher-details-item'); // Use new class for styling
+                        const imgHtml = teacher.imageUrl ? `<img src="${teacher.imageUrl}" alt="${teacher.name}" class="teacher-image">` : '';
+                        resultItem.innerHTML = `
+                            ${imgHtml}
+                             <div class="teacher-details-text">
+                                <p><span class="font-semibold">Name:</span> ${teacher.name}</p>
+                                <p><span class="font-semibold">Card Number:</span> ${teacher.cardNumber}</p>
+                                <p><span class="font-semibold">Assigned Class:</span> ${teacher.assignedClass}</p>
+                                <p><span class="font-semibold">Teacher Number:</span> ${teacher.phone || '-'}</p>
+                                <p><span class="font-semibold">LinkedIn:</span> ${teacher.linkedin ? `<a href="${teacher.linkedin}" target="_blank" class="text-blue-500 hover:underline">${teacher.linkedin}</a>` : '-'}</p>
+                            </div>
+                        `;
+                        teacherSearchResultsContent.appendChild(resultItem);
+                    });
+                }
+            };
+
+
+            addTeacherButton.addEventListener('click', addTeacher);
+            searchTeacherButton.addEventListener('click', searchTeachers);
+
+            // Initial render of teacher list
+            renderTeacherList();
+
+            // --- Result Cards Section ---
+            const resultStudentImageUploadInput = document.getElementById('resultStudentImageUpload'); // New input
+            const resultStudentIdInput = document.getElementById('resultStudentId'); // New input
+            const resultStudentNameInput = document.getElementById('resultStudentName');
+            const resultFatherNameInput = document.getElementById('resultFatherName');
+            const resultRollNumberInput = document.getElementById('resultRollNumber');
+            const resultClassInput = document.getElementById('resultClass');
+            const subjectMarksInputsDiv = document.getElementById('subjectMarksInputs');
+            const addSubjectButton = document.getElementById('addSubjectButton');
+            const removeSubjectButton = document.getElementById('removeSubjectButton');
+            const totalFullMarksSpan = document.getElementById('totalFullMarks');
+            const totalPassMarksSpan = document.getElementById('totalPassMarks');
+            const totalObtainedMarksSpan = document.getElementById('totalObtainedMarks');
+            const percentageSpan = document.getElementById('percentage');
+            const gradeSpan = document.getElementById('grade');
+            const resultStatusSpan = document.getElementById('resultStatus');
+            const saveResultButton = document.getElementById('saveResultButton');
+            const generatePdfButton = document.getElementById('generatePdfButton');
+            const searchResultInput = document.getElementById('searchResultInput');
+            const searchResultButton = document.getElementById('searchResultButton');
+            const resultSearchResultsContent = document.getElementById('resultSearchResultsContent');
+            const loadedResultCardDiv = document.getElementById('loadedResultCard');
+            const resultCardPdfContentDiv = document.getElementById('resultCardPdfContent');
+            const downloadLoadedPdfButton = document.getElementById('downloadLoadedPdfButton');
+
+            let resultCards = JSON.parse(localStorage.getItem('resultCards')) || [];
+
+            const addSubjectInput = () => {
+                const subjectInputDiv = document.createElement('div');
+                subjectInputDiv.classList.add('grid', 'grid-cols-5', 'gap-4', 'mb-2', 'subject-input-row');
+                subjectInputDiv.innerHTML = `
+                    <input type="text" class="subject-name shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline" placeholder="Subject Name">
+                    <input type="number" class="full-marks shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline" placeholder="Full Marks">
+                    <input type="number" class="pass-marks shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline" placeholder="Pass Marks">
+                    <input type="number" class="obtained-marks shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline" placeholder="Obtained Marks">
+                    <input type="text" class="grade shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline" placeholder="Grade" readonly>
+                `;
+                subjectMarksInputsDiv.appendChild(subjectInputDiv);
+
+                // Add event listeners to new inputs for calculation
+                const obtainedMarksInput = subjectInputDiv.querySelector('.obtained-marks');
+                const fullMarksInput = subjectInputDiv.querySelector('.full-marks');
+                const passMarksInput = subjectInputDiv.querySelector('.pass-marks');
+
+                 // Add input event listeners for real-time calculation
+                obtainedMarksInput.addEventListener('input', updateCalculations);
+                fullMarksInput.addEventListener('input', updateCalculations);
+                passMarksInput.addEventListener('input', updateCalculations);
+
+                updateCalculations(); // Update calculations after adding a new subject
+            };
+
+            const removeLastSubjectInput = () => {
+                const subjectInputs = subjectMarksInputsDiv.querySelectorAll('.subject-input-row');
+                if (subjectInputs.length > 0) {
+                    subjectMarksInputsDiv.removeChild(subjectInputs[subjectInputs.length - 1]);
+                    updateCalculations(); // Update calculations after removing a subject
+                }
+            };
+
+             const calculateGrade = (obtained, full) => {
+                if (full <= 0) return '-';
+                const percentage = (obtained / full) * 100;
+                if (percentage >= 90) return 'A+';
+                if (percentage >= 80) return 'A';
+                if (percentage >= 70) return 'B';
+                if (percentage >= 60) return 'C';
+                if (percentage >= 50) return 'D';
+                return 'F';
+            };
+
+            const updateCalculations = () => {
+                let totalFull = 0;
+                let totalPass = 0;
+                let totalObtained = 0;
+                let allPassed = true;
+
+                const subjectInputs = subjectMarksInputsDiv.querySelectorAll('.subject-input-row');
+                subjectInputs.forEach(row => {
+                    const fullMarks = parseInt(row.querySelector('.full-marks').value) || 0;
+                    const passMarks = parseInt(row.querySelector('.pass-marks').value) || 0;
+                    const obtainedMarks = parseInt(row.querySelector('.obtained-marks').value) || 0;
+                    const gradeInput = row.querySelector('.grade');
+
+                    totalFull += fullMarks;
+                    totalPass += passMarks;
+                    totalObtained += obtainedMarks;
+
+                    // Calculate and set grade for the individual subject
+                    gradeInput.value = calculateGrade(obtainedMarks, fullMarks);
+
+                    if (obtainedMarks < passMarks) {
+                        allPassed = false;
+                    }
+                });
+
+                totalFullMarksSpan.textContent = totalFull;
+                totalPassMarksSpan.textContent = totalPass;
+                totalObtainedMarksSpan.textContent = totalObtained;
+
+                const overallPercentage = totalFull > 0 ? (totalObtained / totalFull) * 100 : 0;
+                percentageSpan.textContent = overallPercentage.toFixed(2) + '%';
+
+                // Calculate overall grade based on overall percentage
+                gradeSpan.textContent = calculateGrade(totalObtained, totalFull);
+
+                // Determine result status
+                resultStatusSpan.textContent = allPassed && totalObtained >= totalPass ? 'Pass' : 'Fail';
+                resultStatusSpan.classList.remove('text-green-600', 'text-red-600'); // Remove previous classes
+                resultStatusSpan.classList.add(resultStatusSpan.textContent === 'Pass' ? 'text-green-600' : 'text-red-600');
+            };
+
+            const saveResultCard = () => {
+                const imageFile = resultStudentImageUploadInput.files[0]; // Get image file
+                const studentId = resultStudentIdInput.value.trim(); // Get student ID
+                const studentName = resultStudentNameInput.value.trim();
+                const fatherName = resultFatherNameInput.value.trim();
+                const rollNumber = resultRollNumberInput.value.trim();
+                const studentClass = resultClassInput.value.trim();
+
+                if (!studentName || !fatherName || !rollNumber || !studentClass || !studentId) { // Made studentId mandatory
+                    alert('Please fill in all student details (Student Image, Student ID, Name, Father\'s Name, Roll Number, Class) for the result card.');
+                    return;
+                }
+
+                const subjects = [];
+                const subjectInputs = subjectMarksInputsDiv.querySelectorAll('.subject-input-row');
+                let allSubjectsValid = true;
+                subjectInputs.forEach(row => {
+                    const subjectName = row.querySelector('.subject-name').value.trim();
+                    const fullMarks = parseInt(row.querySelector('.full-marks').value) || 0;
+                    const passMarks = parseInt(row.querySelector('.pass-marks').value) || 0;
+                    const obtainedMarks = parseInt(row.querySelector('.obtained-marks').value) || 0;
+                    const grade = row.querySelector('.grade').value;
+
+                    if (!subjectName || fullMarks <= 0 || passMarks < 0 || obtainedMarks < 0) {
+                        allSubjectsValid = false;
+                        return;
+                    }
+
+                    subjects.push({ subjectName, fullMarks, passMarks, obtainedMarks, grade });
+                });
+
+                if (!allSubjectsValid) {
+                    alert('Please ensure all subject details (Name, Full Marks > 0, Pass/Obtained >= 0) are correctly filled.');
+                    return;
+                }
+
+                const totalFullMarks = parseInt(totalFullMarksSpan.textContent) || 0;
+                const totalPassMarks = parseInt(totalPassMarksSpan.textContent) || 0;
+                const totalObtainedMarks = parseInt(totalObtainedMarksSpan.textContent) || 0;
+                const percentage = percentageSpan.textContent;
+                const grade = gradeSpan.textContent;
+                const resultStatus = resultStatusSpan.textContent;
+                 const schoolLogo = localStorage.getItem('schoolLogo') || ''; // Get saved logo
+
+                 const reader = new FileReader();
+                 reader.onload = (e) => {
+                     const studentImageUrl = e.target.result;
+                     const newResultCard = {
+                         studentImageUrl, // Include student image URL
+                         studentId, // Include student ID
+                         studentName,
+                         fatherName,
+                         rollNumber,
+                         studentClass,
+                         subjects,
+                         totalFullMarks,
+                         totalPassMarks,
+                         totalObtainedMarks,
+                         percentage,
+                         grade,
+                         resultStatus,
+                          schoolLogo // Include logo in result card data
+                     };
+
+                     resultCards.push(newResultCard);
+                     localStorage.setItem('resultCards', JSON.stringify(resultCards));
+                     alert('Result card saved successfully!');
+                     // Clear form (optional, depending on desired workflow)
+                      resultStudentImageUploadInput.value = '';
+                      resultStudentIdInput.value = '';
+                      resultStudentNameInput.value = '';
+                      resultFatherNameInput.value = '';
+                      resultRollNumberInput.value = '';
+                      resultClassInput.value = '';
+                      subjectMarksInputsDiv.innerHTML = ''; // Clear subject inputs
+                      updateCalculations(); // Reset calculations display
+                 };
+
+                 if (imageFile) {
+                     reader.readAsDataURL(imageFile);
+                 } else {
+                      const newResultCard = {
+                          studentImageUrl: '', // No image
+                          studentId, // Include student ID
+                          studentName,
+                          fatherName,
+                          rollNumber,
+                          studentClass,
+                          subjects,
+                          totalFullMarks,
+                          totalPassMarks,
+                          totalObtainedMarks,
+                          percentage,
+                          grade,
+                          resultStatus,
+                           schoolLogo // Include logo in result card data
+                      };
+
+                      resultCards.push(newResultCard);
+                      localStorage.setItem('resultCards', JSON.stringify(resultCards));
+                      alert('Result card saved successfully!');
+                      // Clear form (optional, depending on desired workflow)
+                       resultStudentImageUploadInput.value = '';
+                       resultStudentIdInput.value = '';
+                       resultStudentNameInput.value = '';
+                       resultFatherNameInput.value = '';
+                       resultRollNumberInput.value = '';
+                       resultClassInput.value = '';
+                       subjectMarksInputsDiv.innerHTML = ''; // Clear subject inputs
+                       updateCalculations(); // Reset calculations display
+                 }
+            };
+
+             const generatePdfContentHtml = (resultData) => {
+                 const schoolName = document.querySelector('h1').textContent;
+                 const schoolAddress = document.querySelector('footer p').textContent.split('|')[0].trim(); // Extract address from footer
+
+                 let subjectsTableHtml = `
+                     <div class="marks-table">
+                         <table>
+                             <thead>
+                                 <tr>
+                                     <th>Subject Name</th>
+                                     <th>Full Marks</th>
+                                     <th>Pass Marks</th>
+                                     <th>Obtained Marks</th>
+                                     <th>Grade</th>
+                                 </tr>
+                             </thead>
+                             <tbody>
+                 `;
+
+                 resultData.subjects.forEach(subject => {
+                     subjectsTableHtml += `
+                         <tr>
+                             <td>${subject.subjectName}</td>
+                             <td>${subject.fullMarks}</td>
+                             <td>${subject.passMarks}</td>
+                             <td>${subject.obtainedMarks}</td>
+                             <td>${subject.grade}</td>
+                         </tr>
+                     `;
+                 });
+
+                 subjectsTableHtml += `
+                             </tbody>
+                         </table>
+                     </div>
+                 `;
+
+                 const logoHtml = resultData.schoolLogo ? `<img src="${resultData.schoolLogo}" alt="School Logo">` : '<div class="spacer"></div>'; // Use spacer if no logo
+                 const studentImageHtml = resultData.studentImageUrl ? `<img src="${resultData.studentImageUrl}" alt="${resultData.studentName}" class="student-image">` : ''; // Student image for result card
+
+                 return `
+                     <div id="resultCardPdfContent">
+                         <div class="pdf-school-header">
+                             <div class="logo">${logoHtml}</div>
+                             <div class="school-info">
+                                 <h2>${schoolName}</h2>
+                                 <p>${schoolAddress}</p>
+                             </div>
+                             <div class="spacer"></div> </div>
+                         <h3 style="text-align: center;">Result Card</h3>
+                         <div class="result-student-info">
+                             ${studentImageHtml}
+                             <div class="result-student-details-text">
+                                 <p><strong>Student Name:</strong> ${resultData.studentName}</p>
+                                 <p><strong>Father's Name:</strong> ${resultData.fatherName}</p>
+                                 <p><strong>Roll Number:</strong> ${resultData.rollNumber}</p>
+                                 <p><strong>Student ID:</strong> ${resultData.studentId || '-'}</p>
+                                 <p><strong>Class:</strong> ${resultData.studentClass}</p>
+                             </div>
+                         </div>
+                         ${subjectsTableHtml}
+                         <div class="calculated-results">
+                             <p><strong>Total Full Marks:</strong> ${resultData.totalFullMarks}</p>
+                             <p><strong>Total Pass Marks:</strong> ${resultData.totalPassMarks}</p>
+                             <p><strong>Total Obtained Marks:</strong> ${resultData.totalObtainedMarks}</p>
+                             <p><strong>Percentage:</strong> ${resultData.percentage}</p>
+                             <p><strong>Grade:</strong> ${resultData.grade}</p>
+                             <p><strong>Result Status:</strong> ${resultData.resultStatus}</p>
+                         </div>
+                         <div class="signature-area">
+                             <div class="signature-line"></div>
+                             <p style="text-align: right; margin-top: 5px;">Principal's Signature</p>
+                         </div>
+                         <p style="text-align: center; margin-top: 20px; font-size: 10pt;">yah result card ${schoolName} ki taraf se jaare kiya gya ha.</p>
+                     </div>
+                 `;
+             };
+
+
+            const generatePdf = () => {
+                const imageFile = resultStudentImageUploadInput.files[0]; // Get image file
+                const studentId = resultStudentIdInput.value.trim(); // Get student ID
+                const studentName = resultStudentNameInput.value.trim();
+                const fatherName = resultFatherNameInput.value.trim();
+                const rollNumber = resultRollNumberInput.value.trim();
+                const studentClass = resultClassInput.value.trim();
+                 const schoolLogo = localStorage.getItem('schoolLogo') || ''; // Get saved logo
+
+                if (!studentName || !fatherName || !rollNumber || !studentClass || !studentId) { // Made studentId mandatory
+                    alert('Please fill in all student details (Student Image, Student ID, Name, Father\'s Name, Roll Number, Class) before generating PDF.');
+                    return;
+                }
+
+                const subjects = [];
+                const subjectInputs = subjectMarksInputsDiv.querySelectorAll('.subject-input-row');
+                 let allSubjectsValid = true;
+                subjectInputs.forEach(row => {
+                    const subjectName = row.querySelector('.subject-name').value.trim();
+                    const fullMarks = parseInt(row.querySelector('.full-marks').value) || 0;
+                    const passMarks = parseInt(row.querySelector('.pass-marks').value) || 0;
+                    const obtainedMarks = parseInt(row.querySelector('.obtained-marks').value) || 0;
+                    const grade = row.querySelector('.grade').value;
+
+                     if (!subjectName || fullMarks <= 0 || passMarks < 0 || obtainedMarks < 0) {
+                         allSubjectsValid = false;
+                         return;
+                     }
+
+                    subjects.push({ subjectName, fullMarks, passMarks, obtainedMarks, grade });
+                });
+
+                 if (!allSubjectsValid) {
+                     alert('Please ensure all subject details (Name, Full Marks > 0, Pass/Obtained >= 0) are correctly filled before generating PDF.');
+                     return;
+                 }
+
+                 const reader = new FileReader();
+                 reader.onload = (e) => {
+                     const studentImageUrl = e.target.result;
+                     const resultData = {
+                         studentImageUrl, // Include student image URL
+                         studentId, // Include student ID
+                         studentName,
+                         fatherName,
+                         rollNumber,
+                         studentClass,
+                         subjects,
+                         totalFullMarks: parseInt(totalFullMarksSpan.textContent) || 0,
+                         totalPassMarks: parseInt(totalPassMarksSpan.textContent) || 0,
+                         totalObtainedMarks: parseInt(totalObtainedMarksSpan.textContent) || 0,
+                         percentage: percentageSpan.textContent,
+                         grade: gradeSpan.textContent,
+                         resultStatus: resultStatusSpan.textContent,
+                          schoolLogo // Include logo in result card data
+                     };
+
+                      const pdfContentHtml = generatePdfContentHtml(resultData);
+
+                      // Temporarily add the content to the DOM for html2pdf
+                      const tempDiv = document.createElement('div');
+                      tempDiv.style.position = 'absolute';
+                      tempDiv.style.left = '-9999px'; // Position off-screen
+                      tempDiv.innerHTML = pdfContentHtml;
+                      document.body.appendChild(tempDiv);
+
+
+                     const element = tempDiv; // Use the temporary div
+
+                     const opt = {
+                         margin: 10,
+                         filename: `${resultData.studentName}_ResultCard.pdf`,
+                         image: { type: 'jpeg', quality: 0.98 },
+                         html2canvas: { scale: 2 },
+                         jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }
+                     };
+
+                     html2pdf().from(element).set(opt).save().then(() => {
+                         // Clean up the temporary div
+                         document.body.removeChild(tempDiv);
+                     });
+                 };
+
+                 if (imageFile) {
+                     reader.readAsDataURL(imageFile);
+                 } else {
+                      const resultData = {
+                          studentImageUrl: '', // No image
+                          studentId, // Include student ID
+                          studentName,
+                          fatherName,
+                          rollNumber,
+                          studentClass,
+                          subjects,
+                          totalFullMarks: parseInt(totalFullMarksSpan.textContent) || 0,
+                          totalPassMarks: parseInt(totalPassMarksSpan.textContent) || 0,
+                          totalObtainedMarks: parseInt(totalObtainedMarksSpan.textContent) || 0,
+                          percentage: percentageSpan.textContent,
+                          grade: gradeSpan.textContent,
+                          resultStatus: resultStatusSpan.textContent,
+                           schoolLogo // Include logo in result card data
+                      };
+
+                       const pdfContentHtml = generatePdfContentHtml(resultData);
+
+                       // Temporarily add the content to the DOM for html2pdf
+                       const tempDiv = document.createElement('div');
+                       tempDiv.style.position = 'absolute';
+                       tempDiv.style.left = '-9999px'; // Position off-screen
+                       tempDiv.innerHTML = pdfContentHtml;
+                       document.body.appendChild(tempDiv);
+
+
+                      const element = tempDiv; // Use the temporary div
+
+                      const opt = {
+                          margin: 10,
+                          filename: `${resultData.studentName}_ResultCard.pdf`,
+                          image: { type: 'jpeg', quality: 0.98 },
+                          html2canvas: { scale: 2 },
+                          jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }
+                      };
+
+                      html2pdf().from(element).set(opt).save().then(() => {
+                          // Clean up the temporary div
+                          document.body.removeChild(tempDiv);
+                      });
+                 }
+            };
+
+             const searchResultCards = () => {
+                 const searchTerm = searchResultInput.value.toLowerCase().trim();
+                 resultSearchResultsContent.innerHTML = '';
+                 loadedResultCardDiv.classList.add('hidden'); // Hide loaded card view
+
+                 if (!searchTerm) {
+                     resultSearchResultsContent.innerHTML = '<p class="text-gray-500">Please enter a search term.</p>';
+                     return;
+                 }
+
+                 const filteredResults = resultCards.filter(card =>
+                     card.studentName.toLowerCase().includes(searchTerm) ||
+                     card.rollNumber.toLowerCase().includes(searchTerm) ||
+                     (card.studentId && card.studentId.toLowerCase().includes(searchTerm)) // Search by Student ID
+                 );
+
+                 if (filteredResults.length === 0) {
+                     resultSearchResultsContent.innerHTML = '<p class="text-gray-500">No result cards found matching your search.</p>';
+                 } else {
+                     filteredResults.forEach(card => {
+                         const resultItem = document.createElement('div');
+                         resultItem.classList.add('border-b', 'border-gray-200', 'py-2', 'cursor-pointer', 'hover:bg-gray-100');
+                         resultItem.textContent = `${card.studentName} (Roll No: ${card.rollNumber}, ID: ${card.studentId || '-'})`; // Display ID in search results
+                         resultItem.addEventListener('click', () => loadResultCard(card)); // Add click listener to load card
+                         resultSearchResultsContent.appendChild(resultItem);
+                     });
+                 }
+             };
+
+             const loadResultCard = (cardData) => {
+                 resultCardPdfContentDiv.innerHTML = generatePdfContentHtml(cardData); // Populate the PDF content div
+                 loadedResultCardDiv.classList.remove('hidden'); // Show the loaded card view
+                 downloadLoadedPdfButton.classList.remove('hidden'); // Show download button
+
+                 // Store the current card data for download
+                 downloadLoadedPdfButton.onclick = () => {
+                     const element = resultCardPdfContentDiv;
+                     const opt = {
+                        margin: 10,
+                        filename: `${cardData.studentName}_ResultCard.pdf`,
+                        image: { type: 'jpeg', quality: 0.98 },
+                        html2canvas: { scale: 2 },
+                        jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }
+                     };
+                     html2pdf().from(element).set(opt).save();
+                 };
+             };
+
+
+            addSubjectButton.addEventListener('click', addSubjectInput);
+            removeSubjectButton.addEventListener('click', removeLastSubjectInput);
+            saveResultButton.addEventListener('click', saveResultCard);
+            generatePdfButton.addEventListener('click', generatePdf);
+            searchResultButton.addEventListener('click', searchResultCards);
+
+             // Add initial subject input row on load
+             addSubjectInput();
+
+
+             // --- Support Staff Section ---
+             const supportStaffImageUploadInput = document.getElementById('supportStaffImageUpload');
+             const supportStaffNameInput = document.getElementById('supportStaffName');
+             const supportStaffFatherNameInput = document.getElementById('supportStaffFatherName');
+             const supportStaffRoleInput = document.getElementById('supportStaffRole');
+             const supportStaffEmailInput = document.getElementById('supportStaffEmail');
+             const supportStaffPhoneInput = document.getElementById('supportStaffPhone');
+             const supportStaffLinkedinInput = document.getElementById('supportStaffLinkedin');
+             const addSupportStaffButton = document.getElementById('addSupportStaffButton');
+             const supportStaffListDiv = document.getElementById('supportStaffList');
+             const supportStaffDetailsViewDiv = document.getElementById('supportStaffDetailsView');
+             const supportStaffDetailImageImg = document.getElementById('supportStaffDetailImage');
+             const supportStaffDetailNameSpan = document.getElementById('supportStaffDetailName');
+             const supportStaffDetailFatherNameSpan = document.getElementById('supportStaffDetailFatherName');
+             const supportStaffDetailRoleSpan = document.getElementById('supportStaffDetailRole');
+             const supportStaffDetailEmailSpan = document.getElementById('supportStaffDetailEmail');
+             const supportStaffDetailPhoneSpan = document.getElementById('supportStaffDetailPhone');
+             const supportStaffDetailLinkedinLink = document.getElementById('supportStaffDetailLinkedin');
+             const closeSupportStaffDetailsButton = document.getElementById('closeSupportStaffDetails');
+
+             let supportStaff = JSON.parse(localStorage.getItem('supportStaff')) || [];
+
+             const renderSupportStaffList = () => {
+                 supportStaffListDiv.innerHTML = '';
+                 if (supportStaff.length === 0) {
+                     supportStaffListDiv.innerHTML = '<p class="text-gray-500">No support staff added yet.</p>';
+                 } else {
+                     supportStaff.forEach((staff, index) => {
+                         const staffItem = document.createElement('div');
+                         staffItem.classList.add('support-staff-item');
+                         staffItem.innerHTML = `
+                             ${staff.imageUrl ? `<img src="${staff.imageUrl}" alt="${staff.name}">` : ''}
+                             <div>
+                                 <p class="font-semibold">${staff.name}</p>
+                                 <p class="text-sm text-gray-600">${staff.role}</p>
+                             </div>
+                         `;
+                         staffItem.addEventListener('click', () => showSupportStaffDetails(index));
+                         supportStaffListDiv.appendChild(staffItem);
+                     });
+                 }
+             };
+
+             const addSupportStaff = () => {
+                 const imageFile = supportStaffImageUploadInput.files[0];
+                 const name = supportStaffNameInput.value.trim();
+                 const fatherName = supportStaffFatherNameInput.value.trim();
+                 const role = supportStaffRoleInput.value.trim();
+                 const email = supportStaffEmailInput.value.trim();
+                 const phone = supportStaffPhoneInput.value.trim();
+                 const linkedin = supportStaffLinkedinInput.value.trim();
+
+                 if (!name || !fatherName || !role) {
+                     alert('Please fill in Name, Father\'s Name, and Role for support staff.');
+                     return;
+                 }
+
+                 const reader = new FileReader();
+                 reader.onload = (e) => {
+                     const imageUrl = e.target.result;
+                     const newStaff = { imageUrl, name, fatherName, role, email, phone, linkedin };
+                     supportStaff.push(newStaff);
+                     localStorage.setItem('supportStaff', JSON.stringify(supportStaff));
+                     renderSupportStaffList();
+                     // Clear form
+                     supportStaffImageUploadInput.value = '';
+                     supportStaffNameInput.value = '';
+                     supportStaffFatherNameInput.value = '';
+                     supportStaffRoleInput.value = '';
+                     supportStaffEmailInput.value = '';
+                     supportStaffPhoneInput.value = '';
+                     supportStaffLinkedinInput.value = '';
+                 };
+
+                 if (imageFile) {
+                     reader.readAsDataURL(imageFile);
+                 } else {
+                     const newStaff = { imageUrl: '', name, fatherName, role, email, phone, linkedin };
+                     supportStaff.push(newStaff);
+                     localStorage.setItem('supportStaff', JSON.stringify(supportStaff));
+                     renderSupportStaffList();
+                     // Clear form
+                     supportStaffImageUploadInput.value = '';
+                     supportStaffNameInput.value = '';
+                     supportStaffFatherNameInput.value = '';
+                     supportStaffRoleInput.value = '';
+                     supportStaffEmailInput.value = '';
+                     supportStaffPhoneInput.value = '';
+                     supportStaffLinkedinInput.value = '';
+                 }
+             };
+
+             const showSupportStaffDetails = (index) => {
+                 const staff = supportStaff[index];
+                 if (staff.imageUrl) {
+                     supportStaffDetailImageImg.src = staff.imageUrl;
+                     supportStaffDetailImageImg.classList.remove('hidden');
+                 } else {
+                     supportStaffDetailImageImg.classList.add('hidden');
+                 }
+                 supportStaffDetailNameSpan.textContent = staff.name;
+                 supportStaffDetailFatherNameSpan.textContent = staff.fatherName;
+                 supportStaffDetailRoleSpan.textContent = staff.role;
+                 supportStaffDetailEmailSpan.textContent = staff.email || '-';
+                 supportStaffDetailPhoneSpan.textContent = staff.phone || '-';
+                 if (staff.linkedin) {
+                     supportStaffDetailLinkedinLink.href = staff.linkedin;
+                     supportStaffDetailLinkedinLink.textContent = staff.linkedin;
+                 } else {
+                     supportStaffDetailLinkedinLink.href = '#';
+                     supportStaffDetailLinkedinLink.textContent = '-';
+                 }
+
+                 supportStaffDetailsViewDiv.classList.remove('hidden');
+             };
+
+             const hideSupportStaffDetails = () => {
+                 supportStaffDetailsViewDiv.classList.add('hidden');
+             };
+
+             addSupportStaffButton.addEventListener('click', addSupportStaff);
+             closeSupportStaffDetailsButton.addEventListener('click', hideSupportStaffDetails);
+
+             // Initial render of support staff list
+             renderSupportStaffList();
+
+             // --- Books Section ---
+             const bookClassSelect = document.getElementById('bookClass');
+             const bookNameInput = document.getElementById('bookNameInput');
+             const bookSuggestionsUl = document.getElementById('bookSuggestions');
+             const bookImageUploadInput = document.getElementById('bookImageUpload');
+             const bookDescriptionTextarea = document.getElementById('bookDescription');
+             const addBookButton = document.getElementById('addBookButton');
+             const savedBooksListDiv = document.getElementById('savedBooksList');
+             const bookDetailsViewDiv = document.getElementById('bookDetailsView');
+             const bookDetailImageImg = document.getElementById('bookDetailImage');
+             const bookDetailNameSpan = document.getElementById('bookDetailName');
+             const bookDetailClassSpan = document.getElementById('bookDetailClass');
+             const bookDetailDescriptionSpan = document.getElementById('bookDetailDescription');
+             const closeBookDetailsButton = document.getElementById('closeBookDetails');
+
+             let books = JSON.parse(localStorage.getItem('books')) || [];
+
+             const renderBooksList = () => {
+                 savedBooksListDiv.innerHTML = '';
+                 if (books.length === 0) {
+                     savedBooksListDiv.innerHTML = '<p class="text-gray-500">No books added yet.</p>';
+                 } else {
+                     // Group books by class
+                     const booksByClass = books.reduce((acc, book) => {
+                         (acc[book.class] = acc[book.class] || []).push(book);
+                         return acc;
+                     }, {});
+
+                     for (const className in booksByClass) {
+                         const classGroupHeader = document.createElement('div');
+                         classGroupHeader.classList.add('class-group-header');
+                         classGroupHeader.textContent = className;
+                         savedBooksListDiv.appendChild(classGroupHeader);
+
+                         const bookListForClass = document.createElement('div');
+                         bookListForClass.classList.add('class-books-list', 'ml-4'); // Add margin for indentation
+                         savedBooksListDiv.appendChild(bookListForClass);
+
+                         booksByClass[className].forEach((book, index) => {
+                             const bookItem = document.createElement('div');
+                             bookItem.classList.add('book-item');
+                             bookItem.innerHTML = `
+                                 ${book.imageUrl ? `<img src="${book.imageUrl}" alt="${book.name}">` : ''}
+                                 <div>
+                                     <p class="font-semibold">${book.name}</p>
+                                 </div>
+                             `;
+                              // Find the original index in the flat 'books' array to show details
+                             const originalIndex = books.findIndex(b => b === book);
+                             bookItem.addEventListener('click', () => showBookDetails(originalIndex));
+                             bookListForClass.appendChild(bookItem);
+                         });
+                     }
+                 }
+             };
+
+             const addBook = () => {
+                 const bookClass = bookClassSelect.value;
+                 const bookName = bookNameInput.value.trim();
+                 const bookImageFile = bookImageUploadInput.files[0];
+                 const bookDescription = bookDescriptionTextarea.value.trim();
+
+                 if (!bookClass || !bookName) {
+                     alert('Please select a Class and enter a Book Name.');
+                     return;
+                 }
+
+                 const reader = new FileReader();
+                 reader.onload = (e) => {
+                     const imageUrl = e.target.result;
+                     const newBook = { class: bookClass, name: bookName, imageUrl, description: bookDescription };
+                     books.push(newBook);
+                     localStorage.setItem('books', JSON.stringify(books));
+                     renderBooksList();
+                     // Clear form
+                     bookClassSelect.value = '';
+                     bookNameInput.value = '';
+                     bookImageUploadInput.value = '';
+                     bookDescriptionTextarea.value = '';
+                 };
+
+                 if (bookImageFile) {
+                     reader.readAsDataURL(bookImageFile);
+                 } else {
+                     const newBook = { class: bookClass, name: bookName, imageUrl: '', description: bookDescription };
+                     books.push(newBook);
+                     localStorage.setItem('books', JSON.stringify(books));
+                     renderBooksList();
+                     // Clear form
+                     bookClassSelect.value = '';
+                     bookNameInput.value = '';
+                     bookImageUploadInput.value = '';
+                     bookDescriptionTextarea.value = '';
+                 }
+             };
+
+             const showBookDetails = (index) => {
+                 const book = books[index];
+                 if (book.imageUrl) {
+                     bookDetailImageImg.src = book.imageUrl;
+                     bookDetailImageImg.classList.remove('hidden');
+                 } else {
+                     bookDetailImageImg.classList.add('hidden');
+                 }
+                 bookDetailNameSpan.textContent = book.name;
+                 bookDetailClassSpan.textContent = book.class;
+                 bookDetailDescriptionSpan.textContent = book.description || '-';
+
+                 bookDetailsViewDiv.classList.remove('hidden');
+             };
+
+             const hideBookDetails = () => {
+                 bookDetailsViewDiv.classList.add('hidden');
+             };
+
+             addBookButton.addEventListener('click', addBook);
+             closeBookDetailsButton.addEventListener('click', hideBookDetails);
+
+             // Initial render of books list
+             renderBooksList();
+
+             // Book Name Autocomplete (Simple Example)
+             bookNameInput.addEventListener('input', () => {
+                 const searchTerm = bookNameInput.value.toLowerCase();
+                 bookSuggestionsUl.innerHTML = '';
+
+                 if (searchTerm.length > 0) {
+                     const suggestedBooks = books.filter(book => book.name.toLowerCase().includes(searchTerm));
+                     if (suggestedBooks.length > 0) {
+                         suggestedBooks.forEach(book => {
+                             const li = document.createElement('li');
+                             li.textContent = book.name;
+                             li.addEventListener('click', () => {
+                                 bookNameInput.value = book.name;
+                                 bookSuggestionsUl.classList.add('hidden');
+                             });
+                             bookSuggestionsUl.appendChild(li);
+                         });
+                         bookSuggestionsUl.classList.remove('hidden');
+                     } else {
+                         bookSuggestionsUl.classList.add('hidden');
+                     }
+                 } else {
+                     bookSuggestionsUl.classList.add('hidden');
+                 }
+             });
+
+             // Hide suggestions when clicking outside
+             document.addEventListener('click', (event) => {
+                 if (!bookNameInput.contains(event.target) && !bookSuggestionsUl.contains(event.target)) {
+                     bookSuggestionsUl.classList.add('hidden');
+                 }
+             });
+
+            // --- Code Protection ---
+            // Disable right-click context menu
+            document.addEventListener('contextmenu', (e) => {
+                // alert("Right-click is disabled."); // Optional: show a message
+                e.preventDefault();
+            });
+
+            // Disable common keyboard shortcuts for viewing source/developer tools
+            document.addEventListener('keydown', (e) => {
+                // Disable F12
+                if (e.key === 'F12') {
+                    // alert("Developer tools are disabled."); // Optional: show a message
+                    e.preventDefault();
+                }
+                // Disable Ctrl+Shift+I (Windows/Linux) or Cmd+Option+I (Mac)
+                if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.key === 'I') {
+                     // alert("Developer tools are disabled."); // Optional: show a message
+                    e.preventDefault();
+                }
+                 // Disable Ctrl+U (Windows/Linux) or Cmd+U (Mac) for viewing source
+                 if ((e.ctrlKey || e.metaKey) && e.key === 'U') {
+                      // alert("Viewing source is disabled."); // Optional: show a message
+                     e.preventDefault();
+                 }
+                 // Disable Ctrl+Shift+J (Windows/Linux) or Cmd+Option+J (Mac) for console
+                 if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.key === 'J') {
+                      // alert("Console is disabled."); // Optional: show a message
+                     e.preventDefault();
+                 }
+            });
+
+
+        });
+    </script>
+
+</body>
+</html>
